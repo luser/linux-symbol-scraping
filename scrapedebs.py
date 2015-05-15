@@ -26,6 +26,8 @@ from collections import defaultdict
 from threading import Lock
 from concurrent.futures import ThreadPoolExecutor
 
+from common import fetch_to_file
+
 print_lock = Lock()
 p = print
 
@@ -88,8 +90,10 @@ def fetch_missing_symbols(verbose):
             return just_linux_symbols(content)
     return set()
 
-def fetch_missing_symbols_from_crash(crash_id):
+def fetch_missing_symbols_from_crash(verbose, crash_id):
     url = 'https://crash-stats.mozilla.com/api/ProcessedCrash/?crash_id={crash_id}&datatype=processed'.format(crash_id = crash_id)
+    if verbose:
+        print('Fetching missing symbols from crash: %s' % url)
     r = requests.get(url)
     if r.status_code != 200:
         return set()
@@ -116,15 +120,17 @@ def make_sym_filename(filename, debug_id):
 
 def process_deb(verbose, dump_syms, deb_url, files):
     files = [(f, s) for (f, s) in files if not server_has_file(s)]
+    if not files:
+        # We must have all these symbols already.
+        if verbose:
+            print('No files to process from %s' % deb_url)
+        return []
     if verbose:
         print('Processing %d files from %s' % (len(files), deb_url))
     try:
         tmpdir = tempfile.mkdtemp(suffix='.scrapedebs')
         deb_file = os.path.join(tmpdir, 'file.deb')
-        with open(deb_file, 'wb') as f:
-            r = requests.get(deb_url, stream=True)
-            for chunk in r.iter_content(1024):
-                f.write(chunk)
+        fetch_to_file(deb_url, deb_file)
         # Extract out just the files we want
         subprocess.check_call('dpkg-deb --fsys-tarfile {deb} | tar x {files}'.format(deb=deb_file, files=' '.join('.' + f for f, s in files)),
                               cwd=tmpdir,
@@ -151,7 +157,8 @@ def main():
     options, args = parser.parse_args()
     # Fetch list of missing symbols
     if options.from_crash:
-        missing_symbols = fetch_missing_symbols_from_crash(options.from_crash)
+        missing_symbols = fetch_missing_symbols_from_crash(options.verbose,
+                                                           options.from_crash)
     else:
         missing_symbols = fetch_missing_symbols(options.verbose)
     if options.verbose:
