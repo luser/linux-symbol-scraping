@@ -88,6 +88,14 @@ def fetch_missing_symbols(verbose):
             return just_linux_symbols(content)
     return set()
 
+def fetch_missing_symbols_from_crash(crash_id):
+    url = 'https://crash-stats.mozilla.com/api/ProcessedCrash/?crash_id={crash_id}&datatype=processed'.format(crash_id = crash_id)
+    r = requests.get(url)
+    if r.status_code != 200:
+        return set()
+    j = r.json()
+    return set([(m['debug_file'], m['debug_id']) for m in j['json_dump']['modules'] if 'missing_symbols' in m])
+
 def parse_packages(packages):
     id_map = {}
     cache_file = '/tmp/packages.json'
@@ -139,9 +147,13 @@ def main():
     parser.add_option('-v', '--verbose', dest='verbose', action='store_true')
     parser.add_option('--packages', dest='packages', action='store')
     parser.add_option('--dump-syms', dest='dump_syms', action='store')
+    parser.add_option('--from-crash', dest='from_crash', action='store')
     options, args = parser.parse_args()
     # Fetch list of missing symbols
-    missing_symbols = fetch_missing_symbols(options.verbose)
+    if options.from_crash:
+        missing_symbols = fetch_missing_symbols_from_crash(options.from_crash)
+    else:
+        missing_symbols = fetch_missing_symbols(options.verbose)
     if options.verbose:
         print('Found %d missing symbols' % len(missing_symbols))
     # Fetch list of known Build IDs
