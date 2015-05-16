@@ -200,12 +200,12 @@ def chunk(iterable, chunk_size):
             return
         yield this_chunk
 
-def scrape_all_ddebs():
+def scrape_all_ddebs(worker_count):
     ddebs = AutoSaveDict('/tmp/ddebs.json')
     processed_packages = AutoSaveDict('/tmp/processed-packages.json')
-    with ThreadPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
         package_urls = [url for url in scrape_package_list('http://ddebs.ubuntu.com/pool/main/') if url not in processed_packages]
-        for urls_chunk in chunk(package_urls, multiprocessing.cpu_count()):
+        for urls_chunk in chunk(package_urls, worker_count):
             print('Processing next %d packages...' % len(urls_chunk))
             for url, debs in zip(package_urls,
                                  executor.map(scrape_x86_debs, urls_chunk)):
@@ -218,7 +218,8 @@ def scrape_all_ddebs():
                 processed_packages[url] = True
 
 def main():
-    scrape_all_ddebs()
+    n = int(sys.argv[1]) if len(sys.argv) > 1 else multiprocessing.cpu_count()
+    scrape_all_ddebs(n)
 
 if __name__ == '__main__':
     main()
