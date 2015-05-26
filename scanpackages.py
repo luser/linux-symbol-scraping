@@ -28,7 +28,7 @@ import tempfile
 import urlparse
 
 from common import fetch_to_file
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 class AutoSaveDict(dict):
     def __init__(self, path):
@@ -39,6 +39,7 @@ class AutoSaveDict(dict):
         dict.__setitem__(self, *args, **kwargs)
         with tempfile.NamedTemporaryFile(delete=False) as f:
             json.dump(self, f)
+            f.close()
             os.rename(f.name, self.path)
 
 def GetBuildID(dso):
@@ -186,6 +187,7 @@ def scrape_package_list(main_url):
     if os.path.isfile('/tmp/allpackages'):
         return json.load(open('/tmp/allpackages', 'rb'))
 
+    print('Scraping package listing...')
     package_list = []
     for url in scrape_html_directory_listing(main_url):
         package_list.extend(list(scrape_html_directory_listing(url)))
@@ -203,18 +205,24 @@ def chunk(iterable, chunk_size):
 def scrape_all_ddebs(worker_count):
     ddebs = AutoSaveDict('/tmp/ddebs.json')
     processed_packages = AutoSaveDict('/tmp/processed-packages.json')
+    skip_packages = {}
     with ThreadPoolExecutor(max_workers=worker_count) as executor:
         package_urls = [url for url in scrape_package_list('http://ddebs.ubuntu.com/pool/main/') if url not in processed_packages]
         for urls_chunk in chunk(package_urls, worker_count):
             print('Processing next %d packages...' % len(urls_chunk))
-            for url, debs in zip(package_urls,
+            for url, debs in zip(urls_chunk,
                                  executor.map(scrape_x86_debs, urls_chunk)):
                 print('Processing package %s...' % url)
-                debs = [deb for deb in debs if deb not in ddebs]
+                debs = [deb for deb in debs if deb not in ddebs and not os.path.basename(urlparse.urlparse(deb).path).startswith('linux-image')]
                 print('%d debs to process...' % len(debs))
-                for deb, result in zip(debs, executor.map(process_deb, debs)):
-                    print('Finished processing deb %s' % deb)
-                    ddebs[deb] = result
+                deb_jobs = dict((executor.submit(process_deb, deb), deb) for deb in debs)
+                for future in as_completed(deb_jobs):
+                    deb = deb_jobs[future]
+                    if future.exception() is not None:
+                        print('Error processing %s: %s' % (deb, future.exception()))
+                    else:
+                        print('Finished processing deb %s' % deb)
+                        ddebs[deb] = future.result()
                 processed_packages[url] = True
 
 def main():
