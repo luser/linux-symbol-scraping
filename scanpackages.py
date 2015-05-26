@@ -129,43 +129,6 @@ def process_deb(deb_url):
         shutil.rmtree(tempDir)
     return buildid_files
 
-def scan_packages():
-    # This is a list of Packages files that we will download and process
-    packageTypes = [ "trusty", "trusty-updates" ]
-    archs = ["i386", "amd64"]
-
-    startDir = os.getcwd()
-    # Iterate through all of the Packages files that we care about.
-    for packageType, arch in itertools.product(packageTypes, archs):
-        # Download the package list and process it into a dictionary
-        # index by the package URLs. The payload is the blob of text
-        # associated with the package.
-        packageURL = "http://ddebs.ubuntu.com/dists/%s/main/binary-%s/Packages" % (packageType, arch)
-        print("Downloading Packages list from %s" % packageURL)
-        r = requests.get(packageURL)
-        if r.status_code != 200:
-                continue
-        allPackages = FillPackageList(r.text)
-        alreadyProcessed = 0
-        processed = 0
-        for packageNumber, packageURL in enumerate(allPackages.keys()):
-            if processedPackages.has_key(packageURL):
-                alreadyProcessed += 1
-            else:
-                fullPackageURL = 'http://ddebs.ubuntu.com/' + packageURL
-                output.write(allPackages[packageURL])
-                for path, buildID in process_deb(fullPackageURL):
-                    output.write('BuildID: %s %s %s\n' % (buildID, path, fullPackageURL))
-                output.write("\n\n")
-                print("Processed %d packages, gone through %d of %d." % (processed, packageNumber, len(allPackages)))
-                # Put some spacing between separate commands
-                print("")
-        print("%d were already processed, processed %d more." % (alreadyProcessed, processed))
-        print("\n")
-
-    # Make sure buffers are flushed
-    output.close()
-
 def scrape_html_directory_listing(url):
     r = requests.get(url)
     if r.status_code == 200:
