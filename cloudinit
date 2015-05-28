@@ -1,0 +1,17 @@
+#cloud-config
+packages:
+  - python-pip
+  - git
+
+bootcmd:
+  - dd if=/dev/zero of=/swapfile bs=1M count=1024
+  - mkswap /swapfile
+  - swapon /swapfile
+  - echo 10 | tee /proc/sys/vm/swappiness
+  - echo vm.swappiness = 10 | tee -a /etc/sysctl.conf
+
+runcmd:
+  - pip install html5lib futures requests boto
+  - sudo -H -u ubuntu git -C ~ubuntu clone https://github.com/luser/linux-symbol-scraping.git
+  - sudo -H -u ubuntu sh -c "cd ~/linux-symbol-scraping; python aws-cron.py"
+  - shutdown -h now

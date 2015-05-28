@@ -9,7 +9,7 @@ import logging
 import shutil
 
 from boto.s3.key import Key
-from scanpackages import scrape_all_ddebs
+from scanpackages import scrape_all_ddebs, is_dbg_package
 
 def put_to_s3_compressed(bucket, keyname, filename):
     key = Key(bucket, keyname)
@@ -32,6 +32,7 @@ def get_from_s3_compressed(bucket, keyname, filename):
 
 def main():
     logging.basicConfig(filename='scanpackages.log',
+                        format='%(asctime)s %(levelname)s %(module)s %(message)s',
                         level=logging.DEBUG)
     # urllib3 is chatty.
     urllib3_logger = logging.getLogger('urllib3')
@@ -46,7 +47,7 @@ def main():
     log.info('Fetching ddebs.json from s3...')
     get_from_s3_compressed(bucket, 'ddebs.json', '/tmp/ddebs.json')
     try:
-        scrape_all_ddebs(4, 'http://ddebs.ubuntu.com/pool/main/')
+        #scrape_all_ddebs(4, 'http://ddebs.ubuntu.com/pool/main/')
         scrape_all_ddebs(4, 'http://us.archive.ubuntu.com/ubuntu/pool/main/',
                          is_dbg_package)
     finally:
