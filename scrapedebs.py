@@ -35,7 +35,7 @@ def print(*a, **b):
     with print_lock:
         p(*a, **b)
 
-SYMBOL_SERVER_URL = 'https://s3-us-west-2.amazonaws.com/org.mozilla.crash-stats.symbols-public/v1/'
+SYMBOL_SERVER_URL = 'https://symbols.mozilla.org/'
 MISSING_SYMBOLS_URL = 'https://crash-analysis.mozilla.com/crash_analysis/{date}/{date}-missing-symbols.txt'
 
 def server_has_file(filename):
